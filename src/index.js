@@ -16,6 +16,9 @@ export default class ReactTable extends Methods(Lifecycle(Component)) {
   constructor (props) {
     super(props)
 
+    this.tableRef = React.createRef();
+    this.fakeScrollRef = React.createRef();
+
     this.getResolvedState = this.getResolvedState.bind(this)
     this.getDataModel = this.getDataModel.bind(this)
     this.getSortedData = this.getSortedData.bind(this)
@@ -120,6 +123,9 @@ export default class ReactTable extends Methods(Lifecycle(Component)) {
       sortedData,
       currentlyResizing,
     } = resolvedState
+
+    let fakeScrollLeft = 0;
+    let tableScrollLeft = 0;
 
     // Pagination
     const startRow = pageSize * page
@@ -811,6 +817,17 @@ export default class ReactTable extends Methods(Lifecycle(Component)) {
       )
     }
 
+    const scroll = (type) => {
+      if (type === 'fakeScroll' && this.fakeScrollRef.current.scrollLeft !== tableScrollLeft) {
+        fakeScrollLeft = this.fakeScrollRef.current.scrollLeft;
+        this.tableRef.current.scrollLeft = this.fakeScrollRef.current.scrollLeft;
+      }
+      if (type === 'table' && this.tableRef.current.scrollLeft !== fakeScrollLeft) {
+        tableScrollLeft = this.tableRef.current.scrollLeft;
+        this.fakeScrollRef.current.scrollLeft = this.tableRef.current.scrollLeft;
+      }
+    }
+
     const makeTable = () => (
       <div
         className={classnames('ReactTable', className, rootProps.className)}
@@ -823,7 +840,16 @@ export default class ReactTable extends Methods(Lifecycle(Component)) {
         {showPagination && showPaginationTop ? (
           <div className="pagination-top">{makePagination(true)}</div>
         ) : null}
+        <div
+          ref={this.fakeScrollRef}
+          style={{ overflowX: "auto", overflowY: "hidden" }}
+          onScroll={() => scroll('fakeScroll')}
+        >
+          <div style={{ paddingBottom: '1px', width: `${rowMinWidth}px`, height: 0 }}>&nbsp;</div>
+        </div>
         <TableComponent
+          onScroll={() => scroll('table')}
+          ref={this.tableRef}
           className={classnames(tableProps.className, currentlyResizing ? 'rt-resizing' : '')}
           style={tableProps.style}
           {...tableProps.rest}
@@ -831,6 +857,7 @@ export default class ReactTable extends Methods(Lifecycle(Component)) {
           {hasHeaderGroups ? makeHeaderGroups() : null}
           {makeHeaders()}
           {hasFilters ? makeFilters() : null}
+
           <TbodyComponent
             className={classnames(tBodyProps.className)}
             style={{
